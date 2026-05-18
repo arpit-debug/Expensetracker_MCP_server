@@ -12,6 +12,16 @@ BASE_DIR = os.path.dirname(__file__)
 DB_PATH = os.path.join(BASE_DIR, "myexpenses.db")
 EXPORT_DIR = os.path.join(BASE_DIR, "exports")
 
+# After this line:
+DB_PATH = os.path.join(BASE_DIR, "myexpenses.db")
+
+# Add this:
+os.makedirs(BASE_DIR, exist_ok=True)
+
+# If DB file exists but is read-only, make it writable
+if os.path.exists(DB_PATH):
+    os.chmod(DB_PATH, 0o666)
+
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
 mcp = FastMCP("ExpenseTracker")
@@ -23,8 +33,9 @@ mcp = FastMCP("ExpenseTracker")
 
 
 def init_db():
-    with sqlite3.connect(DB_PATH) as conn:
-
+    with sqlite3.connect(DB_PATH, timeout=10) as conn:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS transactions (
@@ -112,7 +123,7 @@ def add_transaction(
     if type not in ["expense", "income"]:
         return {"status": "error", "message": "type must be expense or income"}
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         cur = conn.execute(
             """
@@ -201,7 +212,7 @@ def update_transaction(
         WHERE id = ?
     """
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
         conn.execute(query, params)
 
     return {
@@ -214,7 +225,7 @@ def update_transaction(
 def delete_transaction(transaction_id: int):
     """Soft delete a transaction."""
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
         conn.execute(
             """
             UPDATE transactions
@@ -235,7 +246,7 @@ def delete_transaction(transaction_id: int):
 def get_transaction(transaction_id: int):
     """Get a single transaction by ID."""
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         cur = conn.execute(
             """
@@ -267,7 +278,7 @@ def list_transactions(
 ):
     """List transactions with pagination."""
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         cur = conn.execute(
             """
@@ -321,7 +332,7 @@ def search_transactions(
 
     query += " ORDER BY date DESC"
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         cur = conn.execute(query, params)
 
@@ -340,7 +351,7 @@ def monthly_summary(month: str):
     start_date = f"{month}-01"
     end_date = f"{month}-31"
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         income = conn.execute(
             """
@@ -379,7 +390,7 @@ def category_breakdown(month: str):
     start_date = f"{month}-01"
     end_date = f"{month}-31"
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         cur = conn.execute(
             """
@@ -407,7 +418,7 @@ def category_breakdown(month: str):
 def set_budget(category: str, amount: float, month: str):
     """Create or update a monthly category budget."""
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         conn.execute(
             """
@@ -436,7 +447,7 @@ def get_budget_status(month: str):
     start_date = f"{month}-01"
     end_date = f"{month}-31"
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         cur = conn.execute(
             """
@@ -481,7 +492,7 @@ def add_recurring_transaction(
 ):
     """Create recurring transaction template."""
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         cur = conn.execute(
             """
@@ -526,7 +537,7 @@ def export_csv(filename: str = "transactions.csv"):
 
     path = os.path.join(EXPORT_DIR, filename)
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         cur = conn.execute(
             """
@@ -564,7 +575,7 @@ def export_json(filename: str = "transactions.json"):
 
     path = os.path.join(EXPORT_DIR, filename)
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         cur = conn.execute(
             """
@@ -600,7 +611,7 @@ def savings_goal(
 ):
     """Create a savings goal."""
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         cur = conn.execute(
             """
@@ -639,7 +650,7 @@ def dashboard_stats():
 
     summary = monthly_summary(current_month)
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
 
         total_transactions = conn.execute(
             """
@@ -697,5 +708,5 @@ def add_numbers(a: float, b: float) -> float:
 
 
 if __name__ == "__main__":
-    mcp.run(transport="http", host="0.0.0.0", port=8000)
+    mcp.run(transport="sse", host="0.0.0.0", port=8000)
     # mcp.run(transport="stdio")
