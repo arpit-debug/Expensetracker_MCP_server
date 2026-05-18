@@ -8,12 +8,10 @@ from datetime import datetime
 from fastmcp import FastMCP
 
 
-BASE_DIR = os.path.dirname(__file__)
+# ✅ NEW
+BASE_DIR = "/tmp"
 DB_PATH = os.path.join(BASE_DIR, "myexpenses.db")
 EXPORT_DIR = os.path.join(BASE_DIR, "exports")
-
-# After this line:
-DB_PATH = os.path.join(BASE_DIR, "myexpenses.db")
 
 # Add this:
 os.makedirs(BASE_DIR, exist_ok=True)
