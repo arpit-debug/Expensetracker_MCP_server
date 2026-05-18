@@ -8,13 +8,13 @@ from datetime import datetime
 from fastmcp import FastMCP
 
 
-# ✅ NEW
-BASE_DIR = "/tmp"
-DB_PATH = os.path.join(BASE_DIR, "myexpenses.db")
-EXPORT_DIR = os.path.join(BASE_DIR, "exports")
+# Use a persistent directory for the database so data survives server restarts.
+# Change DATA_DIR to a volume-mounted path if deploying on Railway/Render/Fly etc.
+DATA_DIR = os.environ.get("DATA_DIR", os.path.expanduser("~/.expensetracker"))
+DB_PATH = os.path.join(DATA_DIR, "myexpenses.db")
+EXPORT_DIR = os.path.join(DATA_DIR, "exports")
 
-# Add this:
-os.makedirs(BASE_DIR, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
 mcp = FastMCP("ExpenseTracker")
@@ -268,22 +268,27 @@ def get_transaction(transaction_id: int):
 def list_transactions(
     limit: int = 20,
     offset: int = 0,
+    month: int = None,
+    year: int = None,
 ):
-    """List transactions with pagination."""
+    """List transactions with pagination. Optionally filter by month (1-12) and/or year (e.g. 2026)."""
+
+    query = "SELECT * FROM transactions WHERE deleted = 0"
+    params = []
+
+    if year is not None:
+        query += " AND strftime('%Y', date) = ?"
+        params.append(str(year))
+
+    if month is not None:
+        query += " AND strftime('%m', date) = ?"
+        params.append(f"{month:02d}")
+
+    query += " ORDER BY date DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
 
     with sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False) as conn:
-
-        cur = conn.execute(
-            """
-            SELECT *
-            FROM transactions
-            WHERE deleted = 0
-            ORDER BY date DESC
-            LIMIT ? OFFSET ?
-            """,
-            (limit, offset),
-        )
-
+        cur = conn.execute(query, params)
         return dict_fetchall(cur)
 
 
