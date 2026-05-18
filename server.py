@@ -15,11 +15,6 @@ EXPORT_DIR = os.path.join(BASE_DIR, "exports")
 
 # Add this:
 os.makedirs(BASE_DIR, exist_ok=True)
-
-# If DB file exists but is read-only, make it writable
-if os.path.exists(DB_PATH):
-    os.chmod(DB_PATH, 0o666)
-
 os.makedirs(EXPORT_DIR, exist_ok=True)
 
 mcp = FastMCP("ExpenseTracker")
