@@ -122,15 +122,15 @@ def list_transactions(
     """List transactions with pagination. Optionally filter by month (1-12) and/or year (e.g. 2026)."""
     query = supabase.table("transactions").select("*").eq("deleted", 0).order("date", desc=True).range(offset, offset + limit - 1)
 
-    # Supabase doesn't have strftime, so filter by date string prefix
+    # Use date range filters because `date` is a PostgreSQL date type
     if year and month:
-        prefix = f"{year}-{month:02d}"
-        query = query.like("date", f"{prefix}%")
+        start_date = f"{year}-{month:02d}-01"
+        end_date = f"{year}-{month:02d}-31"
+        query = query.gte("date", start_date).lte("date", end_date)
     elif year:
-        query = query.like("date", f"{year}%")
+        query = query.gte("date", f"{year}-01-01").lte("date", f"{year}-12-31")
     elif month:
-        # filter by month across any year using gte/lte isn't trivial without RPC;
-        # safest: fetch all and filter in Python
+        # filter by month across any year in Python
         res = query.execute()
         return [r for r in _rows(res) if datetime.strptime(r["date"], "%Y-%m-%d").month == month]
 
@@ -187,7 +187,8 @@ def monthly_summary(month: str):
         supabase.table("transactions")
         .select("type, amount")
         .eq("deleted", 0)
-        .like("date", f"{month}%")
+        .gte("date", f"{month}-01")
+        .lte("date", f"{month}-31")
         .execute()
     )
     income = sum(r["amount"] for r in rows if r["type"] == "income")
@@ -203,7 +204,8 @@ def category_breakdown(month: str):
         .select("category, amount")
         .eq("deleted", 0)
         .eq("type", "expense")
-        .like("date", f"{month}%")
+        .gte("date", f"{month}-01")
+        .lte("date", f"{month}-31")
         .execute()
     )
     totals: dict[str, float] = {}
@@ -235,7 +237,8 @@ def get_budget_status(month: str):
         .select("category, amount")
         .eq("deleted", 0)
         .eq("type", "expense")
-        .like("date", f"{month}%")
+        .gte("date", f"{month}-01")
+        .lte("date", f"{month}-31")
         .execute()
     )
     spent_map: dict[str, float] = {}
